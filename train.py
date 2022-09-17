@@ -23,6 +23,7 @@ from sconf import Config
 
 from donut import DonutDataset
 from lightning_module import DonutDataPLModule, DonutModelPLModule
+from datasets import load_dataset, disable_caching
 
 
 class CustomCheckpointIO(CheckpointIO):
@@ -57,6 +58,10 @@ def train(config):
     model_module = DonutModelPLModule(config)
     data_module = DonutDataPLModule(config)
 
+    dataset_raw = load_dataset("imagefolder", data_dir=config.dataset_name_or_paths, split="train")
+    dataset_raw = dataset_raw.train_test_split(test_size=0.1)
+    dataset_raw["validation"] = dataset_raw["test"]
+
     # add datasets to data_module
     datasets = {"train": [], "validation": []}
     for i, dataset_name_or_path in enumerate(config.dataset_name_or_paths):
@@ -76,7 +81,7 @@ def train(config):
         for split in ["train", "validation"]:
             datasets[split].append(
                 DonutDataset(
-                    dataset_name_or_path=dataset_name_or_path,
+                    dataset=dataset_raw[split],
                     donut_model=model_module.model,
                     max_length=config.max_length,
                     split=split,

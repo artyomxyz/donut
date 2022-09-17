@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import torch
 import zss
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 from nltk import edit_distance
 from torch.utils.data import Dataset
 from transformers.modeling_utils import PreTrainedModel
@@ -42,7 +42,7 @@ class DonutDataset(Dataset):
 
     def __init__(
         self,
-        dataset_name_or_path: str,
+        dataset: Dataset,
         donut_model: PreTrainedModel,
         max_length: int,
         split: str = "train",
@@ -61,7 +61,7 @@ class DonutDataset(Dataset):
         self.prompt_end_token = prompt_end_token if prompt_end_token else task_start_token
         self.sort_json_key = sort_json_key
 
-        self.dataset = load_dataset(dataset_name_or_path, split=self.split)
+        self.dataset = dataset
         self.dataset_length = len(self.dataset)
 
         self.gt_token_sequences = []
