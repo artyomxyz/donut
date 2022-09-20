@@ -58,6 +58,7 @@ setup(
         "sentencepiece",
         "zss",
         "sconf>=0.2.3",
+        "python-Levenshtein",
     ],
     classifiers=[
         "Intended Audience :: Developers",

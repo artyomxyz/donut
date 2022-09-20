@@ -23,8 +23,7 @@ from sconf import Config
 
 from donut import DonutDataset
 from lightning_module import DonutDataPLModule, DonutModelPLModule
-from datasets import load_dataset, disable_caching
-
+from datasets import load_dataset, disable_caching, DatasetDict
 
 class CustomCheckpointIO(CheckpointIO):
     def save_checkpoint(self, checkpoint, path, storage_options=None):
@@ -58,34 +57,26 @@ def train(config):
     model_module = DonutModelPLModule(config)
     data_module = DonutDataPLModule(config)
 
-    dataset_raw = load_dataset("imagefolder", data_dir=config.dataset_name_or_paths, split="train")
-    dataset_raw = dataset_raw.train_test_split(test_size=0.1)
-    dataset_raw["validation"] = dataset_raw["test"]
-
-    # add datasets to data_module
-    datasets = {"train": [], "validation": []}
+    datasets = DatasetDict.load_from_disk(config.dataset_name_or_paths)
     task_name = "invoice"  # e.g., cord-v2, docvqa, rvlcdip, ...
-    
-    for split in ["train", "validation"]:
-        print(f"Building dataset {split}")
-        datasets[split].append(
-            DonutDataset(
-                dataset=dataset_raw[split],
-                donut_model=model_module.model,
-                max_length=config.max_length,
-                split=split,
-                task_start_token=config.task_start_tokens
-                if config.get("task_start_tokens", None)
-                else f"<s_{task_name}>",
-                prompt_end_token=f"<s_{task_name}>",
-                sort_json_key=config.sort_json_key,
-            )
+
+    for split in ["train", "valid"]:
+        datasets[split] = DonutDataset(
+            dataset=datasets[split],
+            donut_model=model_module.model,
+            max_length=config.max_length,
+            split=split,
+            task_start_token=config.task_start_tokens
+            if config.get("task_start_tokens", None)
+            else f"<s_{task_name}>",
+            prompt_end_token=f"<s_{task_name}>",
+            sort_json_key=config.sort_json_key,
         )
         # prompt_end_token is used for ignoring a given prompt in a loss function
         # for docvqa task, i.e., {"question": {used as a prompt}, "answer": {prediction target}},
         # set prompt_end_token to "<s_answer>"
-    data_module.train_datasets = datasets["train"]
-    data_module.val_datasets = datasets["validation"]
+    data_module.train_dataset = datasets["train"]
+    data_module.val_dataset = datasets["valid"]
 
     logger = TensorBoardLogger(
         save_dir=config.result_path,
@@ -101,7 +92,7 @@ def train(config):
         dirpath=Path(config.result_path) / config.exp_name / config.exp_version,
         filename="artifacts",
         save_top_k=1,
-        save_last=False,
+        save_last=True,
         mode="min",
     )
 
@@ -140,4 +131,5 @@ if __name__ == "__main__":
     config.exp_version = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") if not args.exp_version else args.exp_version
 
     save_config_file(config, Path(config.result_path) / config.exp_name / config.exp_version)
+
     train(config)
